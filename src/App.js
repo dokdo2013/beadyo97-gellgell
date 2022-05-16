@@ -1,5 +1,12 @@
 import {
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogContent,
+  AlertDialogOverlay,
   Box,
+  Badge,
   Image,
   Drawer,
   DrawerContent,
@@ -42,9 +49,19 @@ function App() {
     onClose: nameOnClose,
   } = useDisclosure();
   const {
+    isOpen: settingIsOpen,
+    onOpen: settingOnOpen,
+    onClose: settingOnClose,
+  } = useDisclosure();
+  const {
     isOpen: noticeIsOpen,
     onOpen: noticeOnOpen,
     onClose: noticeOnClose,
+  } = useDisclosure();
+  const {
+    isOpen: deleteIsOpen,
+    onOpen: deleteOnOpen,
+    onClose: deleteOnClose,
   } = useDisclosure();
   const btnRef1 = useRef();
   const btnRef2 = useRef();
@@ -60,6 +77,7 @@ function App() {
   const [ranking, setRanking] = useState([]);
   const [myRanking, setMyRanking] = useState(0);
   const [isSpecial, setIsSpecial] = useState(false);
+  const [isLive, setIsLive] = useState(true);
 
   const baseUrl = "https://api-v1.leaven.team";
   // const baseUrl = "http://0.0.0.0:9091";
@@ -70,7 +88,18 @@ function App() {
     // 타이머 설정
     setInterval(() => {
       save();
+      isLive && getRanking();
     }, 1000);
+
+    setInterval(() => {
+      axios
+        .get(baseUrl + "/gell/" + localStorage.getItem("idx"))
+        .then((Response) => {
+          if (Response.data.code === "SUCCESS") {
+            setMyRanking(Response.data.data.rank);
+          }
+        });
+    }, 10000);
   }, []);
 
   const onLoad = () => {
@@ -139,6 +168,118 @@ function App() {
       .catch((Response) => {
         console.log(Response);
       });
+  };
+
+  const logoutSave = () => {
+    localStorage.setItem("name", "");
+    localStorage.setItem("password", "");
+    localStorage.setItem("token", "");
+    localStorage.setItem("count", 0);
+
+    setTimeout(() => {
+      window.location.reload();
+    }, 500);
+  };
+
+  const loginSave = () => {
+    const formName = document.getElementById("loginName").value.trim();
+    const formPassword = document.getElementById("loginPassword").value.trim();
+
+    if (formName === "" || formPassword === "") {
+      toast({
+        title: "오류",
+        description: "이름이나 비밀번호를 입력해주세요",
+        status: "error",
+        duration: 10000,
+        isClosable: true,
+      });
+      return false;
+    } else {
+      axios
+        .post(baseUrl + "/gell/login", {
+          name: formName,
+          password: formPassword,
+          count: -1,
+        })
+        .then((Response) => {
+          if (Response.data.code === "SUCCESS") {
+            setName(formName);
+            setPassword(formPassword);
+            localStorage.setItem("name", formName);
+            localStorage.setItem("password", formPassword);
+            tokenSave();
+            toast({
+              title: "성공",
+              description: "로그인 완료!",
+              status: "success",
+              duration: 10000,
+              isClosable: true,
+            });
+            settingOnClose();
+            setTimeout(() => {
+              window.location.reload();
+            }, 500);
+          }
+        })
+        .catch(() => {
+          toast({
+            title: "로그인 실패",
+            description: "아이디/비밀번호를 확인해주세요.",
+            status: "error",
+            duration: 10000,
+            isClosable: true,
+          });
+        });
+    }
+  };
+
+  const mergeSave = () => {
+    const formName = document.getElementById("mergeName").value.trim();
+    const formPassword = document.getElementById("mergePassword").value.trim();
+    const targetName = localStorage.getItem("name");
+
+    if (formName === "" || formPassword === "") {
+      toast({
+        title: "오류",
+        description: "이름이나 비밀번호를 입력해주세요",
+        status: "error",
+        duration: 10000,
+        isClosable: true,
+      });
+      return false;
+    } else {
+      axios
+        .post(baseUrl + "/gell/merge", {
+          name: formName,
+          password: formPassword,
+          target_name: targetName,
+        })
+        .then((Response) => {
+          if (Response.data.code === "SUCCESS") {
+            toast({
+              title: "성공",
+              description: "계정 합치기에 성공했습니다.",
+              status: "success",
+              duration: 10000,
+              isClosable: true,
+            });
+            settingOnClose();
+            setTimeout(() => {
+              window.location.reload();
+            }, 500);
+          }
+        })
+        .catch(() => {
+          toast({
+            title: "계정확인 실패",
+            description:
+              "합칠 계정을 확인할 수 없어요. 아이디 또는 비밀번호를 확인해주세요.",
+            status: "error",
+            duration: 10000,
+            isClosable: true,
+          });
+        });
+    }
   };
 
   const nameSave = () => {
@@ -221,8 +362,31 @@ function App() {
             });
             return false;
           }
+        })
+        .catch(() => {
+          toast({
+            title: "오류",
+            description:
+              "이미 동일한 이름이 등록되어있습니다. 다른 이름을 입력해주세요.",
+            status: "error",
+            duration: 10000,
+            isClosable: true,
+          });
         });
     }
+  };
+
+  const deleteSave = () => {
+    axios
+      .delete(baseUrl + "/gell", {
+        data: {
+          name: localStorage.getItem("name"),
+          password: localStorage.getItem("password"),
+        },
+      })
+      .then((Response) => {
+        logoutSave();
+      });
   };
 
   const tokenSave = () => {
@@ -285,7 +449,7 @@ function App() {
   return (
     <>
       <Box h={100} pt={5}>
-        <Flex justifyContent="center">
+        <Flex justifyContent="center" flexWrap="wrap">
           <Button
             ref={btnRef1}
             colorScheme="teal"
@@ -305,27 +469,18 @@ function App() {
               mr={2}
               isLoading={isLoading}
             >
-              🎤 이름 정하기
+              🎤 로그인/회원가입
             </Button>
           ) : (
             <Button
               ref={btnRef2}
               colorScheme="teal"
               variant="outline"
-              onClick={() => {
-                toast({
-                  title: "준비 중",
-                  description: "현재 '이름 변경하기' 기능은 준비 중입니다.",
-                  status: "warning",
-                  position: "bottom",
-                  duration: 10000,
-                  isClosable: true,
-                });
-              }}
+              onClick={settingOnOpen}
               mr={2}
               isLoading={isLoading}
             >
-              🎤 이름 변경하기
+              🎤 계정 설정하기
             </Button>
           )}
           <Button
@@ -333,7 +488,6 @@ function App() {
             colorScheme="teal"
             variant="outline"
             onClick={noticeOnOpen}
-            mr={2}
             isLoading={isLoading}
           >
             🚦 유의사항
@@ -383,7 +537,7 @@ function App() {
           </Text>
           <Text display={isLoading ? "none" : "block"} mt={5} mb="10%">
             {name === ""
-              ? "먼저 이름을 설정하셔야 랭킹에 등록됩니다. '이름 정하기' 버튼을 눌러보세요!"
+              ? "로그인/회원가입 버튼을 눌러 계정을 설정해주세요."
               : name + "님은 현재 " + myRanking + "등입니다"}
           </Text>
         </>
@@ -403,11 +557,38 @@ function App() {
               🏆 랭킹{" "}
               <FiRefreshCw
                 size={12}
-                style={{ marginLeft: "4px", cursor: "pointer" }}
+                style={{
+                  marginLeft: "4px",
+                  marginRight: "4px",
+                  cursor: "pointer",
+                }}
                 onClick={() => {
                   getRanking();
                 }}
               />
+              <Badge
+                style={{
+                  height: "25px",
+                  display: "flex",
+                  alignItems: "center",
+                  cursor: "pointer",
+                }}
+                colorScheme="teal"
+                onClick={() => {
+                  setIsLive(!isLive);
+                }}
+              >
+                실시간
+                {isLive ? (
+                  <Badge ml={1} colorScheme="red" variant="outline">
+                    ON
+                  </Badge>
+                ) : (
+                  <Badge ml={1} colorScheme="blue" variant="outline">
+                    OFF
+                  </Badge>
+                )}
+              </Badge>
             </Flex>
           </DrawerHeader>
 
@@ -442,7 +623,7 @@ function App() {
                         {cntItem}
                       </Td>
                       <Td>{item.name}</Td>
-                      <Td>{item.count}</Td>
+                      <Td>{item.count.toLocaleString()}</Td>
                     </Tr>
                   );
                 })}
@@ -472,26 +653,58 @@ function App() {
         <DrawerOverlay />
         <DrawerContent>
           <DrawerCloseButton />
-          <DrawerHeader>🎤 이름 정하기</DrawerHeader>
+          <DrawerHeader>🎤 로그인/회원가입</DrawerHeader>
 
           <DrawerBody>
-            <Text>
+            <Heading size="md">로그인</Heading>
+            {/* <Text>
               이름과 비밀번호를 입력한 뒤 페이지 하단 '설정' 버튼을 꼭
               눌러주세요.
-            </Text>
+            </Text> */}
             <br />
-            <FormControl>
+            <FormControl mb={1}>
+              <FormLabel htmlFor="name">이름</FormLabel>
+              <Input id="loginName" type="text" />
+            </FormControl>
+            <FormControl mb={2}>
+              <FormLabel htmlFor="password">비밀번호</FormLabel>
+              <Input id="loginPassword" type="password" />
+              {/* <FormHelperText>
+                8자 이상 입력해주세요. 비밀번호는 기록을 복구할 때 사용됩니다.
+              </FormHelperText> */}
+            </FormControl>
+            <Button
+              style={{ width: "100%" }}
+              colorScheme="teal"
+              onClick={loginSave}
+            >
+              로그인
+            </Button>
+            <br />
+            <br />
+            <Heading size="md" mt={4} mb={1}>
+              회원가입
+            </Heading>
+            <br />
+            <FormControl mb={1}>
               <FormLabel htmlFor="name">이름</FormLabel>
               <Input id="name" type="text" />
             </FormControl>
             <br />
-            <FormControl>
+            <FormControl mb={2}>
               <FormLabel htmlFor="password">비밀번호</FormLabel>
               <Input id="password" type="password" />
               <FormHelperText>
                 8자 이상 입력해주세요. 비밀번호는 기록을 복구할 때 사용됩니다.
               </FormHelperText>
             </FormControl>
+            <Button
+              style={{ width: "100%" }}
+              colorScheme="teal"
+              onClick={nameSave}
+            >
+              회원가입
+            </Button>
           </DrawerBody>
 
           <DrawerFooter>
@@ -503,12 +716,115 @@ function App() {
             >
               닫기
             </Button>
-            <Button onClick={nameSave} colorScheme="teal">
-              설정
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+
+      <Drawer
+        isOpen={settingIsOpen}
+        placement="right"
+        onClose={settingOnClose}
+        finalFocusRef={btnRef2}
+      >
+        <DrawerOverlay />
+        <DrawerContent>
+          <DrawerCloseButton />
+          <DrawerHeader>🎤 계정 설정하기</DrawerHeader>
+
+          <DrawerBody>
+            <Heading size="md" mb={2}>
+              계정 합치기
+            </Heading>
+            <Text>
+              다른 이름으로 등록된 계정을 지금 로그인한 계정으로 합치는
+              기능입니다. 현재 계정으로 옮길 계정을 입력해주세요.
+              <Text style={{ fontWeight: 900, color: "red" }}>
+                이 명령은 되돌릴 수 없으니 신중하게 실행해주세요.
+              </Text>
+            </Text>
+            <br />
+            <FormControl mb={1}>
+              <FormLabel htmlFor="name">이름</FormLabel>
+              <Input id="mergeName" type="text" />
+            </FormControl>
+            <FormControl mb={2}>
+              <FormLabel htmlFor="password">비밀번호</FormLabel>
+              <Input id="mergePassword" type="password" />
+            </FormControl>
+            <Button
+              style={{ width: "100%" }}
+              colorScheme="teal"
+              onClick={mergeSave}
+            >
+              합치기
+            </Button>
+            <br />
+            <br />
+            <Heading size="md" mt={4} mb={2}>
+              로그아웃
+            </Heading>
+            <Button
+              style={{ width: "100%" }}
+              colorScheme="teal"
+              mb={2}
+              onClick={logoutSave}
+            >
+              로그아웃
+            </Button>
+            <br />
+            <br />
+            <Heading size="md" mt={4} mb={2}>
+              계정 삭제
+            </Heading>
+            <Text mb={2}>
+              현재 로그인된 계정을 삭제하는 기능입니다.
+              <Text style={{ fontWeight: 900, color: "red" }}>
+                이 명령은 되돌릴 수 없으니 신중하게 실행해주세요.
+              </Text>
+            </Text>
+            <Button
+              style={{ width: "100%" }}
+              colorScheme="red"
+              mb={2}
+              onClick={deleteOnOpen}
+            >
+              계정 삭제하기
+            </Button>
+          </DrawerBody>
+
+          <DrawerFooter>
+            <Button
+              variant="outline"
+              colorScheme="teal"
+              mr={3}
+              onClick={settingOnClose}
+            >
+              닫기
             </Button>
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
+
+      <AlertDialog isOpen={deleteIsOpen} onClose={deleteOnClose}>
+        <AlertDialogOverlay>
+          <AlertDialogContent>
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              계정 삭제
+            </AlertDialogHeader>
+
+            <AlertDialogBody>
+              정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+            </AlertDialogBody>
+
+            <AlertDialogFooter>
+              <Button onClick={deleteOnClose}>취소</Button>
+              <Button colorScheme="red" onClick={deleteSave} ml={3}>
+                삭제
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
 
       <Drawer
         isOpen={noticeIsOpen}
@@ -522,28 +838,43 @@ function App() {
           <DrawerHeader>🚦 유의사항</DrawerHeader>
 
           <DrawerBody>
-            <Heading size="md">랭킹 산정은?</Heading>
+            <Heading size="md" mb={1}>
+              랭킹 산정은?
+            </Heading>
             <Text>
               매 1초마다 현재까지 누른 개수를 서버에 보내요. 단, 과도하게 많은
               횟수가 입력되면 부정행위로 판단해서 접속이 차단될 수 있어요.
             </Text>{" "}
             <br />
-            <Heading size="md">
+            <Heading size="md" mb={1}>
               내 기록을 다른 기계에서도 이용하고 싶어요
             </Heading>
             <Text>
-              현재는 기록 이전을 지원하지 않아요. 하나의 기계, 하나의
-              브라우저에서만 우선 이용할 수 있다는 점 참고 부탁드려요.
+              로그인 기능을 이용하면 다른 기계에서도 계속 이어서 누를 수 있어요.
             </Text>
             <br />
-            <Heading size="md">제 기록이 지워졌어요</Heading>
+            <Heading size="md" mb={1}>
+              계정이 여러 개인데 합칠 수 있나요?
+            </Heading>
+            <Text>
+              계정 합치기 기능을 이용하면 여러 개의 계정을 하나로 합칠 수
+              있어요. 하나로 모을 계정으로 먼저 로그인한 뒤, 계정 설정하기
+              버튼을 누르면 합칠 계정의 이름과 비밀번호를 입력해 계정을 합칠 수
+              있어요.
+            </Text>
+            <br />
+            <Heading size="md" mb={1}>
+              제 기록이 지워졌어요
+            </Heading>
             <Text>
               시크릿 모드를 사용하거나, 쿠키 등 인터넷 사용기록을 삭제하면
               기록이 지워질 수 있어요. 지워진 기록은 복구되지 않으며, 새로운
               이름을 설정해서 시작해야해요 (기존 이름 이용 불가).
             </Text>
             <br />
-            <Heading size="md">이미지는 언제 바뀌나요?</Heading>
+            <Heading size="md" mb={1}>
+              이미지는 언제 바뀌나요?
+            </Heading>
             <Text>
               oh 이미지는 매 100클릭마다, 대깨 이미지는 5% 확률로 랜덤으로
               출력됩니다!
