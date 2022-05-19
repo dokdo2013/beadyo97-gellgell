@@ -443,6 +443,15 @@ function App() {
       })
       .then((Response) => {
         getRanking();
+      })
+      .catch((Response) => {
+        toast({
+          title: "오류",
+          description: Response.data.message,
+          status: "error",
+          duration: 10000,
+          isClosable: false,
+        });
       });
   };
 
