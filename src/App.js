@@ -444,10 +444,10 @@ function App() {
       .then((Response) => {
         getRanking();
       })
-      .catch((Response) => {
+      .catch((error) => {
         toast({
           title: "오류",
-          description: Response.data.message,
+          description: error.response.data.message,
           status: "error",
           duration: 10000,
           isClosable: false,
